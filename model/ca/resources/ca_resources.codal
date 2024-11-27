@@ -1,0 +1,210 @@
+/**
+ * Codasip s.r.o.
+ *
+ * CONFIDENTIAL
+ *
+ * Copyright 2022 Codasip s.r.o.
+ *
+ * All Rights Reserved.
+ *
+ * NOTICE: All information contained in this file, is and shall remain the property of
+ * Codasip s.r.o. and its suppliers, if any.
+ *
+ * The intellectual and technical concepts contained herein are confidential and proprietary to
+ * Codasip s.r.o. and are protected by trade secret and copyright law.  In addition, elements of the
+ * technical concepts may be patent pending.
+ *
+ * This file is part of the Codasip Studio product. No part of the Studio product, including this
+ * file, may be use, copied, modified, or distributed except in accordance with the terms contained
+ * in Codasip license agreement under which you obtained this file.
+ *
+ *  \file   ca_
+ *  """""""""""""""""""""""""""""resources.codal
+ *  \author Codasip
+ *  \date   09.02.2022
+ *  \brief  cycle accurate model
+ */
+
+#include "ca_defines.hcodal"
+#include "config.hcodal"
+
+#define BOOLEAN_BIT     1    // Boolean control bit of width 1-bit
+#define TWO_BIT         2       // Two bit wide control signal
+
+ 
+pipeline pipe
+{
+    IF, ID, EX, ME, WB
+};
+
+// -------------------------------------------------------------------------------------------------
+// Fetch stage
+// -------------------------------------------------------------------------------------------------
+
+signal bit[ADDR_W] s_if_nextpc;
+signal bit[ADDR_W] s_if_pcin;
+
+// -------------------------------------------------------------------------------------------------
+// Decode stage
+// -------------------------------------------------------------------------------------------------
+// Memory
+signal bit[MEMOP_W] s_id_memop;
+signal bit[BOOLEAN_BIT] s_id_loadhaz;
+
+// Program Counter
+register bit[ADDR_W] r_id_pc            { pipeline = pipe.ID; };
+// Instruction -- Machine Code
+signal bit[INSTR_W] s_id_instr;
+
+// ALU Operation Control
+signal bit[ALUOP_W] s_id_aluop;
+
+//Control Signals
+signal bit[REGWRITE_W] s_id_regwrite;
+signal bit[SRC2_W] s_id_alusrc2;
+signal bit[HALT_W] s_id_halt;
+
+// Register File Forwarding
+signal bit[RFF1_W] s_rff1_sel;
+signal bit[RFF2_W] s_rff2_sel;
+signal bit[WORD_W] s_id_src1;
+signal bit[WORD_W] s_id_src2;
+
+//Instruction opcode + func3 + func7
+signal bit[OPC_W] s_id_opc;
+
+// Register bits from instruction
+signal bit[RF_XPR_W] s_id_rs1;
+signal bit[RF_XPR_W] s_id_rs2;
+signal bit[RF_XPR_W] s_id_rd;
+
+// Input register values
+signal bit[WORD_W] s_id_reg1;
+signal bit[WORD_W] s_id_reg2;
+
+// Immediate bits from instruction
+signal bit[WORD_W] s_id_immedi; // should these be 32 bits long or shorter?
+signal bit[WORD_W] s_id_immedj;
+signal bit[WORD_W] s_id_immeds;
+signal bit[WORD_W] s_id_immedu;
+signal bit[WORD_W] s_id_immedb;
+signal bit[WORD_W] s_id_immed;
+signal bit[IMMEDOP_W] s_id_immsel;
+signal bit[SRC1_W] s_id_alusrc1;
+signal bit[BRANCHSEL_W] s_id_brnch_sel;
+signal bit[BRANCHOP_W] s_id_brnchop;
+signal bit[RFSEL_W] s_id_rfwt_sel;
+
+// -------------------------------------------------------------------------------------------------
+// Execute stage
+// -------------------------------------------------------------------------------------------------
+// Parity bits for encode/decode
+signal bit[BOOLEAN_BIT] s_ex_p1;
+signal bit[BOOLEAN_BIT] s_ex_p2;
+signal bit[BOOLEAN_BIT] s_ex_p4;
+signal bit[BOOLEAN_BIT] s_ex_p8;
+signal bit[BOOLEAN_BIT] s_ex_p16;
+signal bit[BOOLEAN_BIT] s_ex_p32;
+signal bit[6] s_ex_ecc;
+
+// Memory
+register bit[MEMOP_W] r_ex_memop                { pipeline = pipe.EX; };
+signal bit[2] s_ex_memsize;
+signal bit[WORD_W] s_ex_encoded_data;
+
+register bit[RFSEL_W] r_ex_rfwt_sel          	{ pipeline = pipe.EX; };
+register bit[BRANCHOP_W] r_ex_brnchop          	{ pipeline = pipe.EX; };
+register bit[BRANCHSEL_W] r_ex_brnch_sel        { pipeline = pipe.EX; };
+// Pipelined Program Counter + Instruction
+register bit[ADDR_W] r_ex_pc            		{ pipeline = pipe.EX; };
+register bit[INSTR_W] r_ex_instr                { pipeline = pipe.EX; };
+register bit[HALT_W] r_ex_halt            		{ pipeline = pipe.EX; };
+
+// ALU Operation Control
+register bit[ALUOP_W] r_ex_aluop        		{ pipeline = pipe.EX; };
+register bit[SRC2_W] r_ex_alusrc2          		{ pipeline = pipe.EX; };
+
+// Destination register
+register bit[RF_XPR_W] r_ex_rd           		{ pipeline = pipe.EX; };
+register bit[REGWRITE_W] r_ex_regwrite          { pipeline = pipe.EX; };
+
+// Input values
+register bit[RF_XPR_W] r_ex_src1            		{ pipeline = pipe.EX; };
+register bit[RF_XPR_W] r_ex_src2            		{ pipeline = pipe.EX; };
+register bit[WORD_W] r_ex_reg1            		{ pipeline = pipe.EX; };
+register bit[WORD_W] r_ex_reg2            		{ pipeline = pipe.EX; };
+register bit[WORD_W] r_ex_immed            	    { pipeline = pipe.EX; }; 
+register bit[SRC1_W] r_ex_alusrc1               { pipeline = pipe.EX; }; 
+
+signal bit[WORD_W] s_ex_in1; // ALU inputs from multiplexors
+signal bit[WORD_W] s_ex_in2;
+signal bit[FWDA_W] s_ex_fwdA_sl; // Select lines
+signal bit[FWDB_W] s_ex_fwdB_sl;
+signal bit[WORD_W] s_ex_src1; 
+signal bit[WORD_W] s_ex_src2; // Source 2 to ALU (may change to immed)
+signal bit[WORD_W] s_ex_alu; // ALU result
+signal bit[BOOLEAN_BIT] s_ex_zero;
+signal bit[ADDR_W] s_ex_target_addr;
+
+// -------------------------------------------------------------------------------------------------
+// Memory stage
+// -------------------------------------------------------------------------------------------------
+// Memory
+register bit[WORD_W] r_me_encoded_data         { pipeline = pipe.ME; };
+signal bit[WORD_W] s_me_decoded_data;
+signal bit[WORD_W] s_me_mem_result;
+register bit[2] r_me_memsize               { pipeline = pipe.ME; };
+register bit[MEMOP_W] r_me_memop                { pipeline = pipe.ME; };
+
+register bit[RFSEL_W] r_me_rfwt_sel          	{ pipeline = pipe.ME; };
+register bit[BOOLEAN_BIT] r_me_zero          	{ pipeline = pipe.ME; };
+register bit[WORD_W] r_me_target_addr        	{ pipeline = pipe.ME; };
+
+// Pipelined Program Counter + Instruction + Control for WB stage
+register bit[ADDR_W] r_me_pc           			{ pipeline = pipe.ME; };
+register bit[INSTR_W] r_me_instr                { pipeline = pipe.ME; };
+register bit[RF_XPR_W] r_me_rd           		{ pipeline = pipe.ME; };
+register bit[REGWRITE_W] r_me_regwrite          { pipeline = pipe.ME; };
+register bit[WORD_W] r_me_alu                   { pipeline = pipe.ME; };
+register bit[BRANCHOP_W] r_me_brnchop          	{ pipeline = pipe.ME; };
+
+signal bit[BOOLEAN_BIT] s_me_pcsrc;
+// -------------------------------------------------------------------------------------------------
+// Writeback stage
+// -------------------------------------------------------------------------------------------------
+register bit[WORD_W] r_wb_mem_result            { pipeline = pipe.WB; };
+// Pipelined Program Counter + Instruction
+register bit[ADDR_W] r_wb_pc            		{ pipeline = pipe.WB; };
+register bit[INSTR_W] r_wb_instr                { pipeline = pipe.WB; };
+register bit[RF_XPR_W] r_wb_rd           		{ pipeline = pipe.WB; };
+register bit[REGWRITE_W] r_wb_regwrite          { pipeline = pipe.WB; };
+register bit[WORD_W] r_wb_alu                   { pipeline = pipe.WB; };
+register bit[RFSEL_W] r_wb_rfwt_sel          	{ pipeline = pipe.WB; };
+signal bit[WORD_W] s_wb_result;
+// -------------------------------------------------------------------------------------------------
+// Pipeline control
+// -------------------------------------------------------------------------------------------------
+register bit[ADDR_W] r_id_pc_preserved;
+register bit[INSTR_W] r_id_instr_preserved ;
+signal   bit[1] s_if_stall;
+signal   bit[1] s_id_stall;
+register bit[1] r_id_stall {default = false;};
+signal   bit[1] s_id_clear;
+register bit[1] r_id_clear {default = true;};
+signal   bit[1] s_ex_stall;
+signal   bit[1] s_ex_clear;
+signal   bit[1] s_me_stall;
+signal   bit[1] s_me_clear;
+signal   bit[1] s_wb_stall;
+signal   bit[1] s_wb_clear;
+
+
+
+
+// -------------------------------------------------------------------------------------------------
+// SYSCALL support for simulation
+// -------------------------------------------------------------------------------------------------
+signal bit [BOOLEAN_BIT]            s_syscall_pending;
+signal bit [BOOLEAN_BIT]            s_syscall_stall;
+register bit [TWO_BIT]              r_syscall_delay         {default = 0;};
+
